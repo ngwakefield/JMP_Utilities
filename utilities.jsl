@@ -1,0 +1,259 @@
+// Change Format to Single Decimal
+dt = current data table();
+x = dt << get selected columns(numeric);
+for( i = 1, i <=nitems(x), i++,
+x[i] << format("Fixed Dec", 1)
+)
+
+// Change Format to Percent with One Decimal
+dt = current data table();
+x = dt << get selected columns(numeric);
+for( i = 1, i <=nitems(x), i++,
+x[i] << format("Percent", ,1)
+)
+
+// Add a Decimal to Selected Cells
+dt = current data table();
+selcols = dt << get selected columns();
+
+for(i = 1, i<=nitems(selcols), i++, 
+    dtype = column(dt, selcols[i]) << get datatype;
+    if(dtype == "Numeric,
+        fmat = column(dt, selcols[i]) << get format;
+        x = char(nameexpr(fmat));
+        // Check if a decimal is already set
+        if(contains(x, "Fixed Dec"),
+            // Extract decimal
+            dec = char(regex(x, "\!Fixed Dec\!", \d+, (\d+)", "\1"));
+            formstring = char(regex(x, "Format\(\!"Fixed Dec\!", (\d+), (\d+)\)", "Format(\!"Fixed Dec\!", \1, "||char(num(dec)+1)||")", GLOBALREPLACE));
+            command = "column(dt, \!"" || (selcols[i] << get name) || "\!") << format(" || formstring ||");",
+            contains(x, "Percent"),
+            dec = char(regex(x, "\!Percent\!", \d+, (\d+)", "\1"));
+            formstring = char(regex(x, "Format\(\!"Percent\!", (\d+), (\d+)\)", "Format(\!"Percent\!", \1, "||char(num(dec)+1)||")", GLOBALREPLACE));
+            command = "column(dt, \!"" || (selcols[i] << get name) || "\!") << format(" || formstring ||");",
+            contains(x, "Best"),
+            formstring = char(regex(x, "Format\(\!"Best\!", (\d+), (\d+)\)", "Format(\!"Fixed Dec\!", \1, "||char(num(dec)+1)||")", GLOBALREPLACE));
+            command = "column(dt, \!"" || (selcols[i] << get name) || "\!") << format(" || formstring ||");",
+            command = "";
+            );
+        eval(parse(command));
+
+        )
+    );
+
+// Convert Selected Columns to Character Nominal
+dt = current data table();
+x = dt << get selected columns();
+for( i = 1, i<=nitems(x), i++,
+    x[i] << set data type(character);
+    x[i] << set modeling type(nominal)
+);
+    
+// Convert Selected Columns to Numeric Continuous
+dt = current data table();
+x = dt << get selected columns();
+for( i = 1, i<=nitems(x), i++,
+    x[i] << set data type(numeric);
+    x[i] << set modeling type(continuous)
+);
+
+// Remove column formulas
+dt = current data table();
+selcols = dt << get selected columns();
+for(i = 1, i<=nitems(selcols), i++,
+    if(!isempty(column(dt, selcols[i]) << get property("Formula")),
+        column(dt, selcols[i]) << delete formula)
+    
+    );
+
+// Pull down and fill blanks
+pulldownfill = function(
+
+    {dt = current data table()},
+    {},
+
+    nrows = Nrow(dt);
+    selection = dt << get selected columns(string);
+
+    for(i = 1, i<=nitems(selection), i++,
+        currval = column(selection[i])[1];
+        for(j = 2, j<=nrows, j++,
+            if(ismissing(column(selection[i])[j]),
+                column(selection[i])[j] = currval,
+                currval = column(selection[i])[j]
+            )    
+        )
+    
+    )
+)
+pulldownfill();
+
+
+// Clear Row States
+
+// Row Hide and Exclude
+
+// Row Hide and Exclude Inverse
+current data table() << invert row selection;
+current data table() << hide and exclude;
+
+// Select Matching Cells and Exclude
+current data table() << select matching cells();
+current data table() << hide and exclude(1);
+
+// Select Matching Cells and Exclude Inverse
+current data table() << select matching cells();
+current data table() << invert row selection();
+current data table() << hide and exclude(1);
+
+// Select Matching Cells and delete
+current data table() << select matching cells();
+current data table() << delete rows;
+
+// Select Matching Cells and delete Inverse
+current data table() << select matching cells();
+current data table() << invert row selection();
+current data table() << delete rows;
+
+// Subset Selected
+current data table() << subset(selected rows(1), all columns(1));
+
+// Select Matching and Subset
+current data table() << select matching cells();
+current data table() << subset(selected rows(1), all columns(1));
+
+// Select Matching and Subset Inverse
+current data table() << select matching cells();
+current data table() << invert row selection();
+current data table() << subset(selected rows(1), all columns(1));
+
+// Add Column Selection Restoration Script
+dt = current data table();
+selcols = dt  << get selected columns();
+
+NW = New Window("Selection Name",
+    << modal,
+    textbox("Enter a label for your column selection below" ),
+    tb = texteditbox(""),
+    buttonbox("OK", cname = tb << get text),
+    buttonbox("Cancel")
+);
+
+if(NW["button"]==-1, stop());
+
+eval(evalexpr(
+    current data table() << New Script("Restore " || expr(cname) || " column selection", 
+                            cols = expr(selcols);
+                            current data table() << clear column selection();
+                            for(i = 1, i<=nitems(cols), i++,
+                                column(current data table(), cols[i]) << set selected(1)))))
+
+// Quick Add Row State Col
+dt = current data table();
+X = New Window("Name?",
+    << modal,
+    panelbox("", 
+        textbox("Enter a name for your row states column"),
+        tb = texteditbox("", << set width(200))),
+        buttonbox("OK", tb = tb << gettext),
+        buttonbox("Cancel")
+    );
+if(X["button"] == -1, stop());
+
+dt << New Column(tb, row state, Copy from Row States);
+ 
+// Load Row States from Column
+NW = New Window("Load Which Row State Col?",
+    << modal,
+    lb = List Box(rowcols, width(250), maxselected(1)),
+    buttonbox("OK", lb = lb << get selected),
+    buttonbox("Cancel")
+);
+if(NW["button"] == -1, stop());
+column(dt, lb) << copy to row states();
+
+// Add Per Factor Meand and Std Dev Caption Box
+// Get handle
+gb = current report();
+gbb = gb[Graph Builder Box(1)];
+
+// Add elements
+gbb << Add Element(1, 1, {Type("Caption Box"), X, Y, Summary Statistic("Mean"), Per Factor(1)});
+gbb << Add Element(1, 1, {Type("Caption Box"), X, Y, Summary Statistic("Std Dev"), Per Factor(1)});
+gbb << Add Element(1, 1, {Type("Caption Box"), X, Y, Summary Statistic("N"), Per Factor(1)});
+
+// Remove all Caption Boxes
+gb = current report();
+gbb = gb[Graph Builder Box(1)];
+z = gbb << get elements(1,1);
+
+for(i = nitems(z), i >= 1, i--,
+    if(contains(char(z[i][1]), "Caption Box"), 
+        gbb << Remove Element(1,1,i)
+    )
+);
+
+// Hide VIF and DFDen from Parameter Estimates
+treeWalkerCollapse = Function(
+    {box, eliminate = {}},
+    {child = box << child},
+
+    while(!isempty(child),
+        if(child << classname == "NumberColBox",
+            colhead = child << get heading;
+            if(contains(eliminate, colhead),
+                child << set property("Visibility", Collapse);
+            )
+        );
+    treeWalkerCollapse(child, eliminate); // you could also use recurse(child)
+    child = child << sib;
+    )
+);
+
+mod = current report();
+eff_summ = mod["Parameter Estimates"];
+treeWalkerCollapse(eff_summ, {"VIF", "DFDen"});
+
+
+// Show Sqrt Var Component in REML Estimates
+treeWalkerShow = Function(
+    {box, show = {}},
+    {child = box << child},
+
+    while(!isempty(child),
+        if(child << classname == "NumberColBox",
+            colhead = child << get heading;
+            if(contains(show, colhead),
+                child << set property("Visibility", Visible);
+            )
+        );
+    treeWalkerShow(child, show); // you could also use recurse(child)
+    child = child << sib;
+    )
+);
+
+mod = current report();
+eff_summ = mod["REML Variance Component Estimates"];
+treeWalkerShow(eff_summ, {"Sqrt Variance Component"});
+
+
+// Show 95% CI and VIF
+treeWalkerShow = Function(
+    {box, show = {}},
+    {child = box << child},
+
+    while(!isempty(child),
+        if(child << classname == "NumberColBox",
+            colhead = child << get heading;
+            if(contains(show, colhead),
+                child << set property("Visibility", Visible);
+            )
+        );
+    treeWalkerShow(child, show); // you could also use recurse(child)
+    child = child << sib;
+    )
+);
+
+mod = current report();
+eff_summ = mod["Parameter Estimates"];
+treeWalkerShow(eff_summ, {"Lower 95%", "Upper 95%", "VIF"});
